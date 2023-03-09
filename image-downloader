@@ -1,0 +1,128 @@
+#!/bin/sh
+
+# set -euo pipefail
+
+category=''
+number=''
+directory=''
+media=''
+
+while getopts 'c:n:d:m:i:' flag; do
+	case "${flag}" in
+		c) category="${OPTARG}" ;;
+		n) number="${OPTARG}" ;;
+		d) directory=${OPTARG} ;;
+		m) media="${OPTARG}" ;;
+		c1) client_id_for_pixabay="${OPTARG}"
+		c2) client_id_for_unsplash="${OPTARG}"
+		c3) client_id_for_pexels="${OPTARG}"
+	esac
+done
+
+imageCategory=${category}
+someMedia=${media}
+clientIdForPixabay=${client_id_for_pixabay}
+clientIdForUnsplash=${client_id_for_unsplash}
+clientIdForPexels=${client_id_for_pexels}
+if [ $someMedia == "image" ]; then
+	someFileExtension="jpg"
+else
+	someFileExtension="mp4"
+fi
+startingPoint=$(($(ls ${directory} | wc -l)+1))
+numOfImages=${number}
+numOfImagesIncludingStartingPoint=$(($numOfImages+$startingPoint))
+num=$(("$startingPoint"+1))
+if [ "$imageCategory" == "background" ] || [ "$imageCategory" == "lifestyle" ] || [ "$imageCategory" == "luxury" ] || [ "$imageCategory" == "nature" ] || [ "$imageCategory" == "travel" ] || [ "$imageCategory" == "success" ] || [ "$imageCategory" == "business" ] || [ "$imageCategory" == "animals" ] || [ "$imageCategory" == "motivation" ] || [ "$imageCategory" == "inspiration" ] ; then
+ 	totalPagesUnsplash=$(curl -s "https://api.unsplash.com/search?query=$imageCategory&per_page=30&client_id=$clientIdForUnsplash" | jq -r '.' | grep total_pages | head -n 1 | cut -d ':' -f2 | sed 's/ //g' | tr -d ',')
+ 	totalPagesPixabay=3
+	totalPagesPexels=100
+ 	num=1
+ 	[ ! -d ~/Pictures/images-stock/finished-posts/image-list.txt ] && touch ~/Pictures/images-stock/finished-posts/image-list.txt
+	 	randomImages() {
+ 	 	randomPageUnsplash=$(shuf -i 1-$totalPagesUnsplash -n 1)
+ 	 	randomPagePixabay=$(shuf -i 1-$totalPagesPixabay -n 1)
+ 	 	randomPagePexels=$(shuf -i 1-$totalPagesPexels -n 1)
+	 	declare -a api_list
+		 	if [ $someMedia == "image" ]; then
+ 			 	api_list=("https://api.unsplash.com/search?query=$imageCategory&page=$randomPageUnsplash&per_page=30&client_id=$clientIdForUnsplash" "https://pixabay.com/api/?key=$clientIdForPixabay&q=$imageCategory&page=$randomPagePixabay&per_page=200&image_type=photo")
+			 	photo=${api_list[$(shuf -i 1-2 -n 1)]}
+		 	 	if [ "$photo" = ${api_list[0]} ]; then
+		 	 		randomImg=$(curl -s $photo | jq -r '.' | grep '"regular"' | cut -d ':' -f2- | sed 's/"//g' | tr -d ',' | uniq | shuf -n 1)
+		 	 	else
+		 	 		randomImg=$(curl -s $photo | jq -r '.' | grep largeImageURL | cut -d ':' -f2- | tr -d ',' | tr -d '"' | uniq | shuf -n 1)
+		 	 	fi
+		 	else
+ 			 	api_list=("https://api.pexels.com/videos/search?query=$imageCategory&page=$randomPagePexels&per_page=80&size=small" "https://pixabay.com/api/videos/?key=$client_id_for_pixabay&q=$imageCategory&page=$randomPagePixabay&per_page=200&image_type=photo&min_width=720&min_height=1280")
+			 	photo=${api_list[0]}
+			 	# photo=${api_list[$(shuf -i 0-1 -n 1)]}
+		 	 	if [ "$photo" = ${api_list[0]} ]; then
+		 		 	randomImg=$(curl -s -H "Authorization: $clientIdForPexels" $photo | jq -r '.' | grep '"link"' | cut -d ':' -f2- | sed -e 's/"//g' -e 's/ //g' | uniq | shuf -n 1)
+		 	 	else
+		 		 	randomImg=$(curl -s $photo | jq -r '.' | grep largeImageURL | cut -d ':' -f2- | tr -d ',' | tr -d '"' | uniq | shuf -n 1)
+		 	 	fi
+		 	fi
+	 	 	# wget ""$randomImg"" -O ${directory}/$num.jpg
+		 	echo -e "$randomImg\n   dir=${directory}\n   out=$num.$someFileExtension" >> ~/Pictures/images-stock/finished-posts/image-list.txt
+	 	 	num=$(($num+1))
+ 	 	}
+		 	if [ "$numOfImages" ]; then
+	  	  	 	for (( i=1; i<=$numOfImages; i++ ))
+	  	    	 	 	do
+	  	 	   	 	 	randomImages
+		 		 	done
+		 	sed -i 's/^ //g' ~/Pictures/images-stock/finished-posts/image-list.txt
+		 	aria2c -i ~/Pictures/images-stock/finished-posts/image-list.txt && rm ~/Pictures/images-stock/finished-posts/image-list.txt
+		 	# czkawka-cli dup -d ${directory} -D AEN
+		 	else
+			 	exit 0
+		 	fi
+else
+ 	totalPagesUnsplash=$(curl -s "https://api.unsplash.com/search?query=background,lifestyle,luxury,nature,tralve,success,business&per_page=30&client_id=$clientIdForUnsplash" | jq -r '.' | grep total_pages | head -n 1 | cut -d ':' -f2 | sed 's/ //g' | tr -d ',')
+ 	totalPagesPixabay=3
+ 	num=1
+ 	[ ! -d ~/Pictures/images-stock/finished-posts/image-list.txt ] && touch ~/Pictures/images-stock/finished-posts/image-list.txt
+	 	mixedImages() {
+ 	 	randomPageUnsplash=$(shuf -i 1-$totalPagesUnsplash -n 1)
+ 	 	randomPagePixabay=$(shuf -i 1-$totalPagesPixabay -n 1)
+ 	 	randomPagePexels=$(shuf -i 1-$totalPagesPixabay -n 1)
+ 	 	# api_list=("https://api.unsplash.com/search?query=background,lifestyle,luxury,nature,travel,success,business&page=$randomPageUnsplash&per_page=30&client_id=$clientIdForUnsplash" "https://pixabay.com/api/?key=$clientIdForPixabay&page=$randomPagePixabay&per_page=200&q=lifestyle,luxury,travel,success,business&image_type=photo")
+	 	 	# photo=${api_list[$(shuf -i 0-1 -n 1)]}
+		 	# if [ "$photo" = ${api_list[0]} ]; then
+		 	# randomImg=$(curl -s $photo | jq -r '.' | grep '"regular"' | cut -d ':' -f2- | sed 's/"//g' | tr -d ',' | uniq | shuf -n 1)
+		 	# else
+		 	# randomImg=$(curl -s $photo | jq -r '.' | grep largeImageURL | cut -d ':' -f2- | tr -d ',' | tr -d '"' | uniq | shuf -n 1)
+		 	# fi
+		 	if [ $someMedia == "image" ]; then
+	 	 		photo="https://api.unsplash.com/search?query=background,lifestyle,luxury,nature,travel,success,business&page=$randomPageUnsplash&per_page=30&client_id=$clientIdForUnsplash"
+		 	 	if [ "$photo" = ${api_list[0]} ]; then
+		 	 	randomImg=$(curl -s $photo | jq -r '.' | grep '"regular"' | cut -d ':' -f2- | sed 's/"//g' | tr -d ',' | uniq | shuf -n 1)
+		 	 	else
+		 	 	randomImg=$(curl -s $photo | jq -r '.' | grep largeImageURL | cut -d ':' -f2- | tr -d ',' | tr -d '"' | uniq | shuf -n 1)
+		 	 	fi
+		 	else
+ 			 	api_list=("https://api.pexels.com/videos/search?query=background,lifestyle,luxury,nature,travel,success,business&per_page=80" "https://pixabay.com/api/videos/?key=$clientIdForPixabay&q=$imageCategory&page=$randomPagePixabay&per_page=200&image_type=photo")
+			 	photo=${api_list[0]}
+			 	# photo=${api_list[$(shuf -i 0-1 -n 1)]}
+		 	 	if [ "$photo" = ${api_list[0]} ]; then
+		 		 	randomImg=$(curl -s -H "Authorization: $clientIdForPexels" $photo | jq -r '.' | grep '"link"' | cut -d ':' -f2- | sed -e 's/"//g' -e 's/ //g' | uniq | shuf -n 1)
+		 	 	else
+		 		 	randomImg=$(curl -s $photo | jq -r '.' | grep largeImageURL | cut -d ':' -f2- | tr -d ',' | tr -d '"' | uniq | shuf -n 1)
+		 	 	fi
+		 	fi
+		 	echo -e "$randomImg\n   dir=${directory}\n   out=$num.$someFileExtension" >> ~/Pictures/images-stock/finished-posts/image-list.txt
+	 	 	# wget ""$randomImg"" -O ${directory}/$num.jpg
+	 	 	num=$(($num+1))
+	 	 	}
+		 	if [ "$numOfImages" ]; then
+			 	for (( i=1; i<=$numOfImages; i++ ))
+				 	do
+					 	mixedImages
+				 	done
+		 	sed -i 's/^ //g' ~/Pictures/images-stock/finished-posts/image-list.txt
+		 	aria2c -i ~/Pictures/images-stock/finished-posts/image-list.txt && rm ~/Pictures/images-stock/finished-posts/image-list.txt
+		 	czkawka-cli dup -d ${directory} -D AEN
+		 	else
+			 	exit 0
+		 	fi
+fi
